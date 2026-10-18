@@ -42,8 +42,12 @@ export class EnemyManager {
 
     // Knight Enemy
     this.knight = {
-      x: 46.0,
-      y: 1.0,   // on platform
+      x: 100.0,
+      homeX: 100.0,
+      homeY: 4.7,
+      minX: 97.0,
+      maxX: 105.5,
+      y: 4.7,
       vx: 0.0,
       vy: 0.0,
       isAirborne: false,
@@ -391,11 +395,26 @@ export class EnemyManager {
 
   updateKnight(dt, player) {
     const k = this.knight;
+    if (player.x < k.minX || player.x > k.maxX) {
+      k.x = k.homeX;
+      k.y = k.homeY;
+      k.vx = 0;
+      k.vy = 0;
+      k.isAirborne = false;
+      k.timer = 0;
+      if (k.mesh) {
+        k.mesh.visible = false;
+        k.mesh.position.set(k.x, k.y, 0);
+      }
+      return false;
+    }
+
+    if (k.mesh) k.mesh.visible = true;
     k.timer += dt;
 
     if (!k.isAirborne && k.timer > k.jumpCooldown) {
       const dist = Math.abs(player.x - k.x);
-      if (dist < 14.0 && player.x > 40.0 && player.x < 56.0) {
+      if (dist < 6.0) {
         // Initiate high parabolic leap
         k.isAirborne = true;
         const dir = player.x > k.x ? 1 : -1;
@@ -406,12 +425,12 @@ export class EnemyManager {
     }
 
     if (k.isAirborne) {
-      k.x += k.vx * dt;
+      k.x = THREE.MathUtils.clamp(k.x + k.vx * dt, k.minX, k.maxX);
       k.vy -= 28.0 * dt; // gravity
       k.y += k.vy * dt;
 
-      if (k.y <= 1.0) {
-        k.y = 1.0;
+      if (k.y <= k.homeY) {
+        k.y = k.homeY;
         k.vy = 0;
         k.vx = 0;
         k.isAirborne = false;
