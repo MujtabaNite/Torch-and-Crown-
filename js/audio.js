@@ -25,7 +25,7 @@ class AudioEngine {
     this.threatLevel = 0; // 0 (calm) to 1 (chase climax)
 
     this.isMuted = false;
-    this.masterVolume = 0.85;
+    this.masterVolume = 0.65;
     this.initialized = false;
 
     // Main Menu Theme
@@ -120,7 +120,7 @@ class AudioEngine {
 
     // 1. Sub Bass Drone (Low D1 = 36.71 Hz & Detune)
     this.droneGain = this.ctx.createGain();
-    this.droneGain.gain.setValueAtTime(0.08, now);
+    this.droneGain.gain.setValueAtTime(0.05, now);
     this.droneGain.connect(this.lowPassFilter);
 
     const osc1 = this.ctx.createOscillator();
@@ -143,7 +143,7 @@ class AudioEngine {
 
     // 2. Wind & Cavern Howl (Filtered Noise with LFO)
     this.windGain = this.ctx.createGain();
-    this.windGain.gain.setValueAtTime(0.045, now);
+    this.windGain.gain.setValueAtTime(0.01, now);
     this.windGain.connect(this.lowPassFilter);
 
     const noiseBuffer = this.ctx.createBuffer(1, this.ctx.sampleRate * 2, this.ctx.sampleRate);
@@ -175,7 +175,7 @@ class AudioEngine {
 
     // 3. Torch Crackle (Filtered high noise bursts)
     this.fireGain = this.ctx.createGain();
-    this.fireGain.gain.setValueAtTime(0.05, now);
+    this.fireGain.gain.setValueAtTime(0.006, now);
     this.fireGain.connect(this.lowPassFilter);
 
     const crackleSource = this.ctx.createBufferSource();
@@ -283,6 +283,12 @@ class AudioEngine {
     if (this.droneGain) {
       this.droneGain.gain.setTargetAtTime(0.08 + this.threatLevel * 0.08, now, 0.4);
     }
+  }
+
+  setTorchIntensity(intensity) {
+    if (!this.ctx || !this.fireGain) return;
+    const normalized = Math.max(0, Math.min(1, (intensity - 1.5) / 1.2));
+    this.fireGain.gain.setTargetAtTime(0.004 + normalized * 0.004, this.ctx.currentTime, 0.15);
   }
 
   // Time Mechanics Audio Effects

@@ -76,7 +76,7 @@ export class SceneManager {
     this.camTargetY = 3.2;
     this.camCurrentX = 2.0;
     this.camCurrentY = 3.2;
-    this.camZ = 10.8; // Intimate 2.5D framing
+    this.camZ = 13.0; // Pulled back slightly for better platformer overview
     this.camShake = 0;
 
     // Free camera for trailer

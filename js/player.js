@@ -22,23 +22,23 @@ export class Player {
     this.height = 1.6;
     this.facing = 1; // 1 = right, -1 = left
 
-    // Physical Constants
-    this.speed = 7.5;
-    this.jumpForce = 13.5;
-    this.gravity = 34.0;
+    // Physical Constants — tuned for snappy, responsive feel
+    this.speed = 9.5;
+    this.jumpForce = 16.0;
+    this.gravity = 40.0;
 
     // Jump feel helpers
     this.isGrounded = false;
     this.coyoteTimer = 0.0;
     this.jumpBufferTimer = 0.0;
-    this.coyoteTimeMax = 0.12;
-    this.jumpBufferMax = 0.12;
+    this.coyoteTimeMax = 0.14;
+    this.jumpBufferMax = 0.14;
 
     // Torch & Fuel
     this.fuel = 1.0; // 0.0 to 1.0
-    this.fuelDepletionRate = 0.004; // ~4 minutes base life, replenished at checkpoints
-    this.baseLightRadius = 16.0;
-    this.currentLightRadius = 16.0;
+    this.fuelDepletionRate = 0.0012; // ~13 minutes base life, replenished at checkpoints
+    this.baseLightRadius = 18.0;
+    this.currentLightRadius = 18.0;
 
     // Visual Mesh Group
     this.group = new THREE.Group();
@@ -113,16 +113,16 @@ export class Player {
     head.castShadow = true;
     this.group.add(head);
 
-    // 2. Piercing White Glowing Eyes
+    // 2. Piercing White Glowing Eyes (front-facing)
     const eyeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
     const eyeGeo = new THREE.BoxGeometry(0.08, 0.045, 0.06);
 
     this.eyeLeft = new THREE.Mesh(eyeGeo, eyeMat);
-    this.eyeLeft.position.set(0.14, 1.5, 0.18);
+    this.eyeLeft.position.set(-0.1, 1.5, 0.28);
     this.group.add(this.eyeLeft);
 
     this.eyeRight = new THREE.Mesh(eyeGeo, eyeMat);
-    this.eyeRight.position.set(0.23, 1.5, 0.12);
+    this.eyeRight.position.set(0.1, 1.5, 0.28);
     this.group.add(this.eyeRight);
 
     // 3. Ornate Iron Torch Bracket & Handle
@@ -219,8 +219,8 @@ export class Player {
     }
 
     // Short-hop mechanic: cut jump velocity if releasing key early
-    if (!input.jumpHeld && this.vy > 4.0) {
-      this.vy = 4.0;
+    if (!input.jumpHeld && this.vy > 5.5) {
+      this.vy = 5.5;
     }
 
     // Apply Gravity
@@ -235,7 +235,7 @@ export class Player {
     }
 
     // 4. Torch Fuel & Flame Dynamics
-    this.fuel = Math.max(0.05, this.fuel - this.fuelDepletionRate * dt);
+    this.fuel = Math.max(0.08, this.fuel - this.fuelDepletionRate * dt);
     this.currentLightRadius = this.baseLightRadius * (0.45 + 0.55 * this.fuel);
 
     // Realistic Torch Light Flicker
@@ -290,7 +290,7 @@ export class Player {
     for (const p of platforms) {
       if (!p.isSolid) continue;
       if (this.checkOverlap(this.x, this.y, p)) {
-        if (this.vy < 0) {
+        if (this.vy <= 0) {
           // Landing on platform top
           this.y = p.y + p.h / 2;
           this.vy = 0;

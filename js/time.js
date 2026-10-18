@@ -32,14 +32,15 @@ export class TimeManager {
   update(dt, input, player, enemies) {
     // 1. Process Time Slow (Shift held)
     if (input.slowTimeHeld && this.sand > 5.0 && !this.isRewinding) {
+      if (!this.isTimeSlow) audio.applyTimeSlow(true);
       this.isTimeSlow = true;
       this.worldTimeScale = 0.25;
       this.playerTimeScale = 0.65;
       this.sand = Math.max(0, this.sand - this.sandDrainRate * dt);
 
-      audio.setTimeScale(0.25);
       if (this.fxOverlay) this.fxOverlay.className = 'time-slow';
     } else {
+      if (this.isTimeSlow) audio.applyTimeSlow(false);
       this.isTimeSlow = false;
       this.worldTimeScale = 1.0;
       this.playerTimeScale = 1.0;
@@ -49,7 +50,6 @@ export class TimeManager {
         this.sand = Math.min(this.maxSand, this.sand + this.sandRegenRate * dt);
       }
 
-      audio.setTimeScale(1.0);
       if (this.fxOverlay && !this.isRewinding) {
         this.fxOverlay.className = '';
       }
@@ -98,7 +98,7 @@ export class TimeManager {
   startRewind() {
     this.isRewinding = true;
     this.rewindPlaybackIndex = this.historyBuffer.length - 1;
-    audio.rewindEffect();
+    audio.playRewindSweep();
     if (this.fxOverlay) this.fxOverlay.className = 'time-rewind';
   }
 

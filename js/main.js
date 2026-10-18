@@ -27,9 +27,10 @@ export class Game {
 
     // Game State
     this.state = 'TITLE'; // 'TITLE', 'CINEMATIC', 'PLAY', 'MODAL', 'DEAD', 'ENDING'
+    this.modalReturnState = null;
     this.currentAct = 1;
     this.checkpointX = 2.0;
-    this.checkpointY = 1.0;
+    this.checkpointY = 1.5;  // platform top is y=1.0; spawn above it
     this.deathsCount = 0;
     this.gameTime = 0;
     this.lastFrameTime = performance.now();
@@ -89,8 +90,8 @@ export class Game {
     // 5. Restore Checkpoint from LocalStorage if present
     this.loadCheckpoint();
 
-    // Set initial player position
-    this.teleportPlayer(this.checkpointX, this.checkpointY + 0.5);
+    // Set initial player position above platform top
+    this.teleportPlayer(this.checkpointX, this.checkpointY + 1.5);
 
     // 6. Start Loop
     requestAnimationFrame((t) => this.loop(t));
@@ -430,8 +431,7 @@ export class Game {
     if (title) title.classList.add('hidden');
     audio.stopMenuHorrorTheme();
     audio.resume();
-    // Launch gripping cinematic opening scene at the start
-    this.playCinematic();
+    this.state = 'PLAY';
   }
 
   playCinematic() {
@@ -673,6 +673,9 @@ export class Game {
   }
 
   openModal(modalId) {
+    if (this.state !== 'MODAL' && this.state !== 'ENDING') {
+      this.modalReturnState = this.state;
+    }
     this.state = 'MODAL';
     const el = document.getElementById(modalId);
     if (el) el.classList.add('active');
@@ -681,11 +684,18 @@ export class Game {
   closeModal(modalId) {
     const el = document.getElementById(modalId);
     if (el) el.classList.remove('active');
+    if (this.state === 'MODAL') {
+      this.state = this.modalReturnState || 'PLAY';
+    }
+    this.modalReturnState = null;
   }
 
   closeAllModals() {
     document.querySelectorAll('.modal-layer').forEach(m => m.classList.remove('active'));
-    if (this.state === 'MODAL') this.state = 'PLAY';
+    if (this.state === 'MODAL' || this.state === 'ENDING') {
+      this.state = this.modalReturnState || 'PLAY';
+    }
+    this.modalReturnState = null;
   }
 
   showToast(msg) {

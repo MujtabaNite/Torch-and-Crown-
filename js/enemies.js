@@ -14,10 +14,10 @@ export class EnemyManager {
     // Rook Enemy
     this.rook = {
       x: 32.0,
-      y: 0.0,
+      y: 1.0,  // sits on platform top (platform top = y=1.5)
       vx: 1.8,
       direction: 1,
-      minX: 26.0,
+      minX: 28.0,
       maxX: 40.0,
       chargeSpeed: 5.6,
       patrolSpeed: 1.8,
@@ -43,7 +43,7 @@ export class EnemyManager {
     // Knight Enemy
     this.knight = {
       x: 46.0,
-      y: 0.0,
+      y: 1.0,   // on platform
       vx: 0.0,
       vy: 0.0,
       isAirborne: false,
@@ -78,9 +78,9 @@ export class EnemyManager {
     // 3. Build Knight
     this.buildKnightMesh();
 
-    // 4. Build Pawn Swarm Spawners
-    this.spawnPawnSwarm(22.0);
-    this.spawnPawnSwarm(24.5);
+    // 4. Build Pawn Swarm Spawners (on Brazier Courtyard platform)
+    this.spawnPawnSwarm(22.5);
+    this.spawnPawnSwarm(25.0);
     this.spawnPawnSwarm(62.0);
     this.spawnPawnSwarm(64.5);
 
@@ -222,7 +222,7 @@ export class EnemyManager {
 
     this.pawnSwarms.push({
       x: xPos,
-      y: 0,
+      y: 1.0,   // on ground
       vx: 1.4,
       mesh: group,
       alive: true,
@@ -410,8 +410,8 @@ export class EnemyManager {
       k.vy -= 28.0 * dt; // gravity
       k.y += k.vy * dt;
 
-      if (k.y <= 0) {
-        k.y = 0;
+      if (k.y <= 1.0) {
+        k.y = 1.0;
         k.vy = 0;
         k.vx = 0;
         k.isAirborne = false;
