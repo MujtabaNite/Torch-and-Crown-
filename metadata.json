@@ -1,0 +1,6 @@
+{
+  "name": "Torch and Crown",
+  "description": "A dark chess horror 2.5D side-scroller built for game jam themes Fire, Shadow, and Time.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

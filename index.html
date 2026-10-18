@@ -1,0 +1,864 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Torch and Crown: A Pawn's Walk Through the Dark</title>
+    <meta name="description" content="A dark chess horror 2.5D side-scroller crafted in Three.js for game jam themes Fire, Shadow, and Time." />
+    <meta property="og:title" content="Torch and Crown: A Pawn's Walk Through the Dark" />
+    <meta property="og:description" content="A dark chess horror 2.5D side-scroller crafted in Three.js for game jam themes Fire, Shadow, and Time." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Playfair+Display:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./style.css" />
+
+    <style>
+      :root {
+        --ink: #05060a;
+        --dark-slate: #0d1117;
+        --bone: #e6dfd2;
+        --blood: #b3122b;
+        --ember: #ff7722;
+        --ember-bright: #ffb042;
+        --sand: #e5b842;
+        --sand-glow: #ffe68a;
+        --stone: #1a1e24;
+        --stone-border: #333945;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+
+      html, body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background-color: var(--ink);
+        color: var(--bone);
+        font-family: 'Cinzel', 'Playfair Display', Georgia, serif;
+      }
+
+      #canvas-container {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 1;
+      }
+
+      #game-canvas {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+
+      /* Post-process / Visual FX Overlays */
+      #fx-overlay {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 5;
+        transition: opacity 0.2s ease;
+      }
+
+      #fx-overlay.time-slow {
+        box-shadow: inset 0 0 100px rgba(40, 160, 220, 0.4), inset 0 0 200px rgba(10, 50, 90, 0.5);
+      }
+
+      #fx-overlay.time-rewind {
+        background: repeating-linear-gradient(
+          0deg,
+          rgba(0, 0, 0, 0.25),
+          rgba(0, 0, 0, 0.25) 2px,
+          rgba(255, 255, 255, 0.05) 2px,
+          rgba(255, 255, 255, 0.05) 4px
+        );
+        box-shadow: inset 0 0 120px rgba(220, 60, 40, 0.4);
+      }
+
+      #flash-overlay {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 6;
+        opacity: 0;
+        background-color: #fff;
+        transition: opacity 0.08s ease;
+      }
+
+      #fade-overlay {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 20;
+        background-color: #000;
+        opacity: 0;
+        transition: opacity 0.4s ease;
+      }
+
+      /* 2.39:1 CinemaScope Letterbox */
+      .letterbox-bar {
+        position: absolute;
+        left: 0;
+        right: 0;
+        background: #000;
+        z-index: 10;
+        pointer-events: none;
+        height: 0;
+        transition: height 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+
+      #letterbox-top { top: 0; }
+      #letterbox-bottom { bottom: 0; }
+
+      body.letterbox-active .letterbox-bar { height: 10vh; }
+      body.letterbox-deep .letterbox-bar { height: 14vh; }
+
+      /* HUD System */
+      #hud-container {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 8;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        padding: 24px 32px;
+        transition: opacity 0.3s ease;
+      }
+
+      body.hud-hidden #hud-container { opacity: 0; }
+
+      .hud-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+      }
+
+      .hud-group {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        background: rgba(8, 10, 14, 0.78);
+        padding: 8px 18px;
+        border-radius: 4px;
+        border: 1px solid rgba(230, 223, 210, 0.15);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+      }
+
+      .hud-label {
+        font-size: 11px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        color: rgba(230, 223, 210, 0.65);
+      }
+
+      .hud-value {
+        font-size: 15px;
+        color: var(--bone);
+        letter-spacing: 1px;
+      }
+
+      .meter-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .meter-track {
+        width: 140px;
+        height: 8px;
+        background: rgba(20, 24, 30, 0.85);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 2px;
+        overflow: hidden;
+        position: relative;
+      }
+
+      .meter-fill {
+        height: 100%;
+        width: 100%;
+        transform-origin: left;
+        transition: width 0.1s linear;
+      }
+
+      .torch-fill {
+        background: linear-gradient(90deg, #ff4400, #ff8a2b, #ffd050);
+        box-shadow: 0 0 10px rgba(255, 120, 30, 0.8);
+      }
+
+      .sand-fill {
+        background: linear-gradient(90deg, #b8860b, #e5b842, #ffe68a);
+        box-shadow: 0 0 10px rgba(229, 184, 66, 0.8);
+      }
+
+      .meter-icon {
+        font-size: 16px;
+        display: flex;
+        align-items: center;
+      }
+
+      .hud-bottom {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .hud-hints {
+        display: flex;
+        gap: 20px;
+        background: rgba(8, 10, 14, 0.78);
+        padding: 6px 18px;
+        border: 1px solid rgba(230, 223, 210, 0.12);
+        border-radius: 4px;
+        font-size: 12px;
+        letter-spacing: 1.5px;
+        color: rgba(230, 223, 210, 0.85);
+      }
+
+      .hud-hints kbd {
+        background: rgba(255, 255, 255, 0.14);
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-family: inherit;
+        font-size: 11px;
+        color: #fff;
+        margin-right: 4px;
+      }
+
+      /* Subtitles / Lore Text */
+      #subtitles-area {
+        position: absolute;
+        bottom: 84px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: min(720px, 88vw);
+        text-align: center;
+        pointer-events: none;
+        z-index: 12;
+      }
+
+      .subtitle-text {
+        font-size: clamp(16px, 2.2vw, 22px);
+        line-height: 1.6;
+        font-style: italic;
+        color: var(--bone);
+        text-shadow: 0 2px 10px rgba(0, 0, 0, 0.95), 0 0 20px rgba(0, 0, 0, 0.8);
+        letter-spacing: 1px;
+        background: rgba(5, 6, 10, 0.8);
+        padding: 8px 24px;
+        border-radius: 4px;
+        display: inline-block;
+      }
+
+      .subtitle-speaker {
+        display: block;
+        font-size: 12px;
+        letter-spacing: 3px;
+        text-transform: uppercase;
+        color: var(--blood);
+        margin-bottom: 4px;
+        font-style: normal;
+      }
+
+      #prompt-toast {
+        position: absolute;
+        top: 90px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(14, 18, 24, 0.92);
+        border: 1px solid var(--blood);
+        padding: 8px 24px;
+        border-radius: 4px;
+        font-size: 14px;
+        letter-spacing: 2px;
+        color: var(--bone);
+        pointer-events: none;
+        z-index: 12;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        box-shadow: 0 4px 20px rgba(179, 18, 43, 0.4);
+      }
+
+      #prompt-toast.active { opacity: 1; }
+
+      /* Modals & Dialogs */
+      .modal-layer {
+        position: absolute;
+        inset: 0;
+        background: rgba(5, 6, 10, 0.88);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 30;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease;
+      }
+
+      .modal-layer.active {
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      .modal-box {
+        background: #0d1117;
+        border: 1px solid rgba(230, 223, 210, 0.2);
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.9), 0 0 40px rgba(179, 18, 43, 0.2);
+        padding: 36px 44px;
+        max-width: min(640px, 90vw);
+        width: 100%;
+        text-align: center;
+        border-radius: 4px;
+        position: relative;
+      }
+
+      .modal-box h2 {
+        font-size: 28px;
+        letter-spacing: 3px;
+        margin-bottom: 16px;
+        color: var(--bone);
+        font-weight: 400;
+      }
+
+      .modal-box p {
+        font-size: 17px;
+        line-height: 1.7;
+        color: rgba(230, 223, 210, 0.85);
+        margin-bottom: 24px;
+      }
+
+      .btn-row {
+        display: flex;
+        justify-content: center;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+
+      button.game-btn {
+        background: #141922;
+        color: var(--bone);
+        border: 1px solid var(--stone-border);
+        padding: 12px 28px;
+        font-family: inherit;
+        font-size: 14px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border-radius: 2px;
+      }
+
+      button.game-btn:hover {
+        background: #1e2532;
+        border-color: var(--bone);
+        box-shadow: 0 0 15px rgba(230, 223, 210, 0.2);
+      }
+
+      button.game-btn.primary {
+        background: #241118;
+        border-color: var(--blood);
+        color: #fff;
+      }
+
+      button.game-btn.primary:hover {
+        background: var(--blood);
+        box-shadow: 0 0 20px rgba(179, 18, 43, 0.6);
+      }
+
+      /* Slide Puzzle Board */
+      #slide-board {
+        display: grid;
+        grid-template-columns: repeat(3, 90px);
+        grid-template-rows: repeat(3, 90px);
+        gap: 6px;
+        margin: 20px auto;
+        width: 282px;
+        height: 282px;
+        background: #07090d;
+        padding: 6px;
+        border: 2px solid #2d3440;
+      }
+
+      .slide-tile {
+        background: #161c26;
+        border: 1px solid #3d4656;
+        color: var(--bone);
+        font-size: 26px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: background 0.15s ease, transform 0.1s ease;
+      }
+
+      .slide-tile:hover {
+        background: #232c3d;
+        border-color: var(--ember);
+      }
+
+      .slide-tile.empty {
+        background: transparent;
+        border-color: transparent;
+        cursor: default;
+      }
+
+      /* Shadow Puzzle View */
+      #shadow-puzzle-stage {
+        margin: 20px auto;
+        width: 320px;
+        height: 200px;
+        background: #090c10;
+        border: 1px solid #333d4e;
+        position: relative;
+        overflow: hidden;
+      }
+
+      #target-silhouette {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 72px;
+        color: rgba(255, 255, 255, 0.08);
+        border: 2px dashed rgba(229, 184, 66, 0.3);
+        padding: 10px 24px;
+      }
+
+      #cast-silhouette {
+        position: absolute;
+        font-size: 72px;
+        color: #000;
+        filter: drop-shadow(0 0 8px rgba(0, 0, 0, 0.9));
+        transform: translate(-50%, -50%);
+        transition: transform 0.05s linear;
+      }
+
+      /* Promotion Ending Choices */
+      .crowns-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+        margin: 28px 0;
+      }
+
+      .crown-card {
+        background: #11151e;
+        border: 1px solid #2c3442;
+        padding: 20px 12px;
+        cursor: pointer;
+        transition: all 0.25s ease;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .crown-card:hover {
+        border-color: var(--ember-bright);
+        transform: translateY(-4px);
+        background: #18202d;
+        box-shadow: 0 8px 24px rgba(255, 176, 66, 0.25);
+      }
+
+      .crown-icon {
+        font-size: 38px;
+        color: #ffd875;
+        text-shadow: 0 0 15px rgba(255, 216, 117, 0.5);
+      }
+
+      .crown-title {
+        font-size: 15px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+      }
+
+      /* Title Screen (Translucent so 3D background is beautifully visible) */
+      #title-screen {
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(circle at center, rgba(14, 18, 26, 0.45) 0%, rgba(5, 6, 10, 0.88) 85%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 25;
+        transition: opacity 0.5s ease;
+      }
+
+      #title-screen.hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .game-title {
+        font-size: clamp(38px, 6vw, 76px);
+        letter-spacing: 7px;
+        font-weight: 400;
+        color: var(--bone);
+        text-shadow: 0 0 30px rgba(179, 18, 43, 0.6), 0 4px 12px #000;
+        margin-bottom: 8px;
+        text-align: center;
+      }
+
+      .game-subtitle {
+        font-size: clamp(14px, 1.8vw, 20px);
+        letter-spacing: 4px;
+        text-transform: uppercase;
+        color: var(--blood);
+        margin-bottom: 28px;
+        font-style: italic;
+        text-align: center;
+      }
+
+      .theme-tags {
+        display: flex;
+        gap: 18px;
+        margin-bottom: 36px;
+      }
+
+      .theme-pill {
+        font-size: 12px;
+        letter-spacing: 3px;
+        text-transform: uppercase;
+        padding: 4px 14px;
+        border: 1px solid rgba(230, 223, 210, 0.2);
+        color: rgba(230, 223, 210, 0.6);
+        border-radius: 2px;
+      }
+
+      .theme-pill.fire {
+        border-color: rgba(255, 120, 30, 0.4);
+        color: var(--ember-bright);
+      }
+
+      .theme-pill.shadow {
+        border-color: rgba(160, 160, 180, 0.4);
+        color: #c0c6d4;
+      }
+
+      .theme-pill.time {
+        border-color: rgba(229, 184, 66, 0.4);
+        color: var(--sand-glow);
+      }
+
+      /* Clean Main Menu: ONLY Play and Settings buttons */
+      .title-buttons {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        width: min(280px, 80vw);
+      }
+
+      .title-buttons button {
+        padding: 15px 32px;
+        font-size: 16px;
+        letter-spacing: 3px;
+      }
+
+      /* Trailer Director Bar (?trailer=1) */
+      #trailer-bar {
+        position: absolute;
+        top: 16px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(10, 13, 18, 0.92);
+        border: 1px solid rgba(229, 184, 66, 0.4);
+        border-radius: 4px;
+        padding: 6px 16px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        z-index: 15;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.7);
+        font-size: 12px;
+        letter-spacing: 1px;
+      }
+
+      #trailer-bar.hidden {
+        display: none;
+      }
+
+      .trailer-badge {
+        background: var(--sand);
+        color: #000;
+        font-weight: bold;
+        padding: 2px 6px;
+        border-radius: 2px;
+        font-size: 10px;
+        letter-spacing: 1px;
+      }
+
+      .act-pills {
+        display: flex;
+        gap: 6px;
+      }
+
+      .act-btn {
+        background: #1a202c;
+        border: 1px solid #333d4e;
+        color: var(--bone);
+        padding: 3px 8px;
+        font-size: 11px;
+        cursor: pointer;
+        border-radius: 2px;
+      }
+
+      .act-btn:hover, .act-btn.active {
+        background: var(--ember);
+        border-color: var(--ember-bright);
+        color: #fff;
+      }
+
+      #skip-cinematic-btn {
+        position: absolute;
+        bottom: 28px;
+        right: 36px;
+        background: rgba(10, 13, 18, 0.85);
+        border: 1px solid rgba(230, 223, 210, 0.4);
+        color: rgba(230, 223, 210, 0.9);
+        padding: 8px 20px;
+        font-family: inherit;
+        font-size: 12px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        cursor: pointer;
+        z-index: 15;
+        border-radius: 2px;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease;
+      }
+
+      #skip-cinematic-btn.visible {
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      #skip-cinematic-btn:hover {
+        border-color: var(--bone);
+        color: #fff;
+      }
+    </style>
+
+    <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
+    </script>
+  </head>
+  <body>
+    <!-- 2.39:1 Letterbox Bars -->
+    <div id="letterbox-top" class="letterbox-bar"></div>
+    <div id="letterbox-bottom" class="letterbox-bar"></div>
+
+    <!-- 3D Canvas Mount -->
+    <div id="canvas-container">
+      <canvas id="game-canvas"></canvas>
+    </div>
+
+    <!-- Fullscreen FX Overlays -->
+    <div id="fx-overlay"></div>
+    <div id="flash-overlay"></div>
+    <div id="fade-overlay"></div>
+
+    <!-- In-Game HUD -->
+    <div id="hud-container">
+      <div class="hud-top">
+        <div class="hud-group">
+          <div>
+            <div class="hud-label">Objective</div>
+            <div id="act-title" class="hud-value">Act I: The Cellar</div>
+          </div>
+          <div>
+            <div class="hud-label">Lore</div>
+            <div id="clues-value" class="hud-value">0 / 4 Clues</div>
+          </div>
+        </div>
+
+        <div class="hud-group">
+          <div class="meter-row">
+            <span class="meter-icon" title="Torch Fuel">🔥</span>
+            <div>
+              <div class="hud-label">Torch Fuel</div>
+              <div class="meter-track">
+                <div id="torch-bar" class="meter-fill torch-fill" style="width: 100%;"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="meter-row">
+            <span class="meter-icon" title="Hourglass Sand">⏳</span>
+            <div>
+              <div class="hud-label">Time Sand</div>
+              <div class="meter-track">
+                <div id="sand-bar" class="meter-fill sand-fill" style="width: 100%;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="hud-bottom">
+        <div class="hud-hints">
+          <span><kbd>A</kbd><kbd>D</kbd> Walk</span>
+          <span><kbd>W</kbd> Jump</span>
+          <span><kbd>Shift</kbd> Slow Time</span>
+          <span><kbd>Q</kbd> Rewind</span>
+          <span><kbd>E</kbd> Interact</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Subtitles / Lore area -->
+    <div id="subtitles-area">
+      <div id="subtitle-box" class="subtitle-text" style="display: none;">
+        <span id="subtitle-speaker" class="subtitle-speaker">Narrator</span>
+        <span id="subtitle-content">On the Hollow King's eternal board, millions fell unnamed.</span>
+      </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="prompt-toast"></div>
+
+    <!-- Skip Cinematic button -->
+    <button id="skip-cinematic-btn" type="button">Skip [Space]</button>
+
+    <!-- Trailer Mode Director Toolbar (?trailer=1) -->
+    <div id="trailer-bar" class="hidden">
+      <span class="trailer-badge">TRAILER MODE</span>
+      <div class="act-pills">
+        <button class="act-btn" data-act="1" title="Jump to Act 1 (Key 1)">1: Cellar</button>
+        <button class="act-btn" data-act="2" title="Jump to Act 2 (Key 2)">2: Puzzles</button>
+        <button class="act-btn" data-act="3" title="Jump to Act 3 (Key 3)">3: Horde</button>
+        <button class="act-btn" data-act="4" title="Jump to Act 4 (Key 4)">4: Blades</button>
+        <button class="act-btn" data-act="5" title="Jump to Act 5 (Key 5)">5: Altar</button>
+      </div>
+      <button class="act-btn" id="btn-toggle-hud" title="Toggle HUD (Key H)">HUD [H]</button>
+      <button class="act-btn" id="btn-toggle-cam" title="Toggle Free Cam (Key F)">Free Cam [F]</button>
+      <button class="act-btn" id="btn-toggle-cin" title="Toggle Letterbox (Key C)">Bars [C]</button>
+      <span id="speed-display" style="color: var(--sand); font-size: 11px;">1.0x</span>
+    </div>
+
+    <!-- Clean Main Menu: Only Play and Settings buttons -->
+    <div id="title-screen">
+      <h1 class="game-title">TORCH AND CROWN</h1>
+      <p class="game-subtitle">A Pawn's Walk Through the Dark</p>
+      <div class="title-buttons">
+        <button id="btn-start" class="game-btn primary" type="button">Play</button>
+        <button id="btn-settings" class="game-btn" type="button">Settings</button>
+      </div>
+    </div>
+
+    <!-- Note Modal -->
+    <div id="note-modal" class="modal-layer">
+      <div class="modal-box">
+        <h2 id="note-title">Parchment Fragment</h2>
+        <p id="note-body">The false stones remember the way, but only where the torch can reach them.</p>
+        <div class="btn-row">
+          <button id="btn-close-note" class="game-btn primary" type="button">Continue [E]</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Slide Puzzle Modal -->
+    <div id="slide-modal" class="modal-layer">
+      <div class="modal-box">
+        <h2>The Shattered Crest</h2>
+        <p>Align the obsidian tiles of the ancient relief to release the portcullis latch.</p>
+        <div id="slide-board"></div>
+        <div class="btn-row">
+          <button id="btn-solve-slide" class="game-btn" type="button">Force Gate (Solve)</button>
+          <button id="btn-close-slide" class="game-btn primary" type="button">Step Away</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Shadow Puzzle Modal -->
+    <div id="shadow-modal" class="modal-layer">
+      <div class="modal-box">
+        <h2>The Shadow Inscription</h2>
+        <p>Rotate the relic so its cast shadow aligns with the carved royal crest.</p>
+        <div id="shadow-puzzle-stage">
+          <div id="target-silhouette">♛</div>
+          <div id="cast-silhouette">♛</div>
+        </div>
+        <div class="btn-row">
+          <button id="btn-rot-left" class="game-btn" type="button">Rotate Left [A]</button>
+          <button id="btn-rot-right" class="game-btn" type="button">Rotate Right [D]</button>
+          <button id="btn-align-shadow" class="game-btn primary" type="button">Lock Shadow [E]</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Promotion Ending Modal -->
+    <div id="ending-modal" class="modal-layer">
+      <div class="modal-box" style="max-width: 820px;">
+        <h2 id="ending-heading">The Altar of Promotion</h2>
+        <p id="ending-description">
+          He reached the Eighth Rank, bloodied and underestimated by every piece he passed.
+          The Hollow King waits with four crowns. "Choose," it whispers. "Everyone does."
+        </p>
+        <div id="crowns-container" class="crowns-grid">
+          <div class="crown-card" data-crown="Queen">
+            <span class="crown-icon">♛</span>
+            <span class="crown-title">The Queen</span>
+          </div>
+          <div class="crown-card" data-crown="Rook">
+            <span class="crown-icon">♜</span>
+            <span class="crown-title">The Rook</span>
+          </div>
+          <div class="crown-card" data-crown="Bishop">
+            <span class="crown-icon">♝</span>
+            <span class="crown-title">The Bishop</span>
+          </div>
+          <div class="crown-card" data-crown="Knight">
+            <span class="crown-icon">♞</span>
+            <span class="crown-title">The Knight</span>
+          </div>
+        </div>
+        <div id="ending-result" style="display: none;">
+          <p id="ending-text" style="font-size: 19px; line-height: 1.8; font-style: italic; color: #fff;"></p>
+          <div class="btn-row">
+            <button id="btn-restart-game" class="game-btn primary" type="button">Walk Again</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings & Info Modal -->
+    <div id="settings-modal" class="modal-layer">
+      <div class="modal-box">
+        <h2>Game Configuration</h2>
+        <p>Torch and Crown: 2.5D chess horror platformer crafted for game jam themes Fire, Shadow, and Time.</p>
+        <div style="text-align: left; margin: 20px 0; font-size: 14px; line-height: 2;">
+          <div><label><input type="checkbox" id="chk-flicker" checked> Reduced Light Flicker (Photosensitivity)</label></div>
+          <div><label><input type="checkbox" id="chk-retro" checked> Retro Scanline &amp; Bloom Post-Processing</label></div>
+          <div><label>Master Volume: <input type="range" id="rng-volume" min="0" max="1" step="0.05" value="0.8" style="vertical-align: middle; width: 140px;"></label></div>
+          <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);">
+            <button id="btn-enable-trailer" class="game-btn" type="button" style="padding: 6px 14px; font-size: 11px;">Enable Trailer Director Tools</button>
+          </div>
+        </div>
+        <div class="btn-row">
+          <button id="btn-close-settings" class="game-btn primary" type="button">Apply &amp; Return</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Game Script -->
+    <script type="module" src="./js/main.js"></script>
+  </body>
+</html>
